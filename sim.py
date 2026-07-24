@@ -16,13 +16,70 @@ class Bracelet(Enum):
 with open("Mortimer.csv", mode="r") as file:
     tasks = list(csv.reader(file))[1:]
 
+total_weight = 0
+for task in tasks:
+    total_weight += int(task[2])
+
 superiors_count = 0
 simming_task = False
 
 def main():
-    task = get_task("Hydras")
-    ticks_wasted = sim_ticks_wasted(task, 0, 150)
-    print(f"task wastes {ticks_wasted/HOUR} hours")
+    task_options = choose_task_options("Hydras", 100)
+    for option in task_options:
+        ticks_wasted = sim_ticks_wasted(get_task(option[0]), int(option[1]), int(option[2]))
+        print(f"{option[0]} task with {option[1]} quantity and {option[2]}% more hearts wastes {ticks_wasted/HOUR} hours")
+
+def choose_task_options(last_task: str, tasks_completed: int):
+    task_options: list[list[str]]
+    task_options = []
+    for option in range(3 if tasks_completed >= 100 else 2):
+        # choose task, can't be the previous task or one of the others on offer
+        chosen_task = last_task
+        while(chosen_task == last_task):
+            task_by_weight = random.randrange(total_weight)
+            for task in tasks:
+                task_by_weight -= int(task[2])
+                if(task_by_weight < 0):
+                    #check if repeat
+                    if(option != 0):
+                        for previous_option in range(option):
+                            if(task_options[previous_option][1] == task[1]):
+                                break
+                    chosen_task = task[1]
+                    break
+        # choose modifier
+        modifiers_unlocked = 2
+        if tasks_completed >= 25: modifiers_unlocked = 3
+        if tasks_completed >= 50: modifiers_unlocked = 4
+        if tasks_completed >= 75: modifiers_unlocked = 5
+        task = get_task(chosen_task)
+        modifier = random.randrange(modifiers_unlocked)
+        #reroll modifier when clue scroll modifiers are impossible
+        while(task[10] == "N/A" and modifier == 2):
+            modifier = random.randrange(modifiers_unlocked)
+        match(modifier):
+            #slayer points
+            case 0:
+                task_options.append([chosen_task, "0", "0"])
+            #task quantity
+            case 1:
+                if int(task[6]) < 0:
+                    length_modifier = -random.randrange(-int(task[6]), (-int(task[7])) + 1)
+                else:
+                    length_modifier = random.randrange(int(task[6]), int(task[7]) + 1)
+                task_options.append([chosen_task, length_modifier, "0"])
+            #clue scrolls
+            case 2:
+                task_options.append([chosen_task, "0", "0"])
+            #superior drop rate
+            case 3:
+                length_modifier = random.randrange(int(task[8]), int(task[9]) + 1)
+                task_options.append([chosen_task, "0", "30"])
+            #slayer xp
+            case 4:
+                task_options.append([chosen_task, "0", "0"])
+    return task_options
+            
 
 def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
     global simming_task
