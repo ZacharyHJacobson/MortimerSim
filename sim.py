@@ -5,7 +5,7 @@ import random
 TASK_PREP_TIME = 30 # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 HOUR = 6000
 SUPERIOR_RATE = 150
-SIMS_PER_TASK = 5000
+SIMS_PER_TASK = 500
 HEARTS_SIMULATED = 10
 TIME_PER_HEART = 600 * HOUR
 class Bracelet(Enum):
