@@ -5,7 +5,7 @@ import random
 TASK_PREP_TIME = 30 # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 HOUR = 6000
 SUPERIOR_RATE = 150
-SIMS_PER_TASK = 20
+SIMS_PER_TASK = 2000
 HEARTS_SIMULATED = 10
 TIME_PER_HEART = 70 * HOUR
 class Bracelet(Enum):
@@ -21,6 +21,20 @@ for t in tasks:
     total_weight += int(t[2])
 
 def main():
+    # sim_all()
+    write_expected_rates()
+
+def write_expected_rates():
+    ratings = []
+    for task in tasks:
+        print(f"Writing {task[1]}...")
+        ratings.append([task[1], sim_ticks_wasted(task, 0, 0), sim_ticks_wasted(task, int(task[6]), 0), sim_ticks_wasted(task, int(task[7]), 0), sim_ticks_wasted(task, 0, int(task[14].split(".")[0])), sim_ticks_wasted(task, 0, int(task[15].split(".")[0]))])
+
+    with open("task_ratings.csv", "w", newline ="") as rfile:
+        csv.writer(rfile).writerows(ratings)
+
+
+def sim_all():
     total_time_taken = 0
     for _ in range(HEARTS_SIMULATED):
         total_time_taken += sim()
