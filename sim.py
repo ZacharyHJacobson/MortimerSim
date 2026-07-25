@@ -5,9 +5,9 @@ import random
 TASK_PREP_TIME = 30 # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 HOUR = 6000
 SUPERIOR_RATE = 150
-SIMS_PER_TASK = 500
+SIMS_PER_TASK = 20
 HEARTS_SIMULATED = 10
-TIME_PER_HEART = 600 * HOUR
+TIME_PER_HEART = 70 * HOUR
 class Bracelet(Enum):
     NONE = 1
     SLAUGHTER = 2
@@ -21,10 +21,18 @@ for t in tasks:
     total_weight += int(t[2])
 
 def main():
+    total_time_taken = 0
+    for _ in range(HEARTS_SIMULATED):
+        total_time_taken += sim()
+    print(f"total time taken: {total_time_taken}")
+    print(f"time taken per heart: {total_time_taken/HEARTS_SIMULATED}")
+
+
+def sim():
     got_heart = False
     total_time = 0
     last_task = "None"
-    tasks_completed = 0
+    tasks_completed = 100
     while(got_heart == False):
         task_options = choose_task_options(last_task, tasks_completed)
         task_ratings = []
@@ -34,16 +42,18 @@ def main():
         best_option = task_ratings.index(min(task_ratings))
         last_task = task_options[best_option][0]
         best_task = get_task(last_task)
+        # print(f"tasks completed: {tasks_completed} time taken: {total_time}")
         if(task_ratings[best_option] < 0):
             task_length = calc_task_length(best_task, int(task_options[best_option][1]), Bracelet.SLAUGHTER, False)
-            print(f"doing {best_task[1]} with {option[1]} quantity and {option[2]}% more hearts using slaughter bracelets over {task_options}")
+            # print(f"doing {best_task[1]} with {task_options[best_option][1]} quantity and {task_options[best_option][2]}% more hearts using slaughter bracelets over {task_options}")
         else:
             task_length = calc_task_length(best_task, int(task_options[best_option][1]), Bracelet.EXPEDITIOUS, False)
-            print(f"doing {best_task[1]} with {option[1]} quantity and {option[2]}% more hearts using expeditious bracelets over {task_options}")
+            # print(f"doing {best_task[1]} with {task_options[best_option][1]} quantity and {task_options[best_option][2]}% more hearts using expeditious bracelets over {task_options}")
         total_time += calc_time(best_task, task_length)
         got_heart = check_for_heart(best_task, task_length, int(task_options[best_option][2]))
         tasks_completed += 1
     print(f"total time: {total_time}, tasks completed: {tasks_completed}")
+    return(total_time)
     
 
 def choose_task_options(last_task: str, tasks_completed: int):
@@ -90,7 +100,9 @@ def choose_task_options(last_task: str, tasks_completed: int):
                 task_options.append([chosen_task, "0", "0"])
             #superior drop rate
             case 3:
-                superior_modifier = random.randrange(int(task[8]), int(task[9]) + 1)
+                min = int(task[14].split(".")[0])
+                max = int(task[15].split(".")[0])
+                superior_modifier = 5 * random.randrange(int(min/5), int(max/5) + 1)
                 task_options.append([chosen_task, "0", superior_modifier])
             #slayer xp
             case 4:
@@ -114,7 +126,7 @@ def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
 
 def calc_time(task: list[str], task_length: int):
     time = TASK_PREP_TIME + int(task[17])
-    time += int(task_length / float(task[18])) * HOUR
+    time += int(task_length / float(task[18]) * HOUR)
     return(time)
 
 
@@ -148,6 +160,7 @@ def check_for_heart(task: list[str], task_length: int, drop_modifier: int):
     return False
 
 def spawn_superior(heart_chance: int, drop_modifier: int):
+    # print(f"changed {int((heart_chance * 100) / (100 + 0))} to {int((heart_chance * 100) / (100 + drop_modifier))}")
     heart_chance = int((heart_chance * 100) / (100 + drop_modifier))
     return(random.randrange(heart_chance) == 0)
 
