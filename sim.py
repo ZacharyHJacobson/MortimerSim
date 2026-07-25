@@ -17,24 +17,65 @@ with open("task_ratings.csv", mode="r") as srfile:
 
 config = configparser.ConfigParser()
 config.read("config.ini")
+VERBOSE = config.getboolean("settings", "verbose")
 TASK_PREP_TIME = config.getint("settings", "task_prep_time") # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 SUPERIOR_RATE = config.getint("settings", "superior_rate")
 SIMS_PER_TASK = config.getint("settings", "sims_per_task")
 HEARTS_SIMULATED = config.getint("settings", "hearts_simulated")
 TIME_PER_HEART = config.getfloat("settings", "time_per_heart")
 SLAYER_CAPE = config.getboolean("settings", "slayer_cape")
-BLOCKS = config["settings"]["blocks"]
+BLOCKS = [config["settings"]["block1"],config["settings"]["block2"]]
 WRITE_RATES = config.getboolean("mode", "write_rates")
 
 total_weight = 0
 for t in tasks:
     total_weight += int(t[2])
 
+# tasks complete, time taken, xp gained, the five modifiers for each task
+task_stats = {
+    "Crawling Hands": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Cave Crawlers": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Banshees": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Rockslugs": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Cockatrice": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Pyrefiends": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Infernal Mages": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Bloodveld": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Gryphons": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Jellies": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Custodian Stalkers": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Turoth": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Warped Creatures": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Cave Horrors": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Aberrant Spectres": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Basilisks": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Wyrms": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Dust Devils": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Kurask": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Venators": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Gargoyles": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Aquanites": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Nechryael": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Drakes": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Abyssal Demons": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Dark Beasts": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Araxytes": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Smoke Devils": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Hydras": [0, 0, 0, 0, 0, 0, 0, 0]
+}
+
+total_tasks = 0
+xp_boost = 0.0
+
 def main():
     if WRITE_RATES:
         write_expected_rates()
     else:
         sim_all()
+        if(VERBOSE):
+            print("[total tasks across all sims, time spent on task in ticks, xp gained, slayer point modifiers, task length modifiers, clue scroll modifiers, superior modifiers, bonus xp]")
+            print(task_stats)
+            print(f"total tasks: {total_tasks}")
 
 def write_expected_rates():
     ratings = []
@@ -77,15 +118,28 @@ def sim():
         else:
             task_length = calc_task_length(best_task, int(task_options[best_option][1]), Bracelet.EXPEDITIOUS, False)
             # print(f"doing {best_task[1]} with {task_options[best_option][1]} quantity and {task_options[best_option][2]}% more hearts using expeditious bracelets over {task_options}")
-        total_time += calc_time(best_task, task_length)
+        added_time = calc_time(best_task, task_length)
+        global xp_boost
+        xp_boost = 0.0
+        if(task_options[best_option][3] == 7):
+            xp_boost = float(int(best_task[12].split(".")[0]) + int(best_task[13].split(".")[0]))/200.0
+        task_stats[last_task][0] += 1
+        task_stats[last_task][1] += added_time
+        task_stats[last_task][task_options[best_option][3]] += 1
+        total_time += added_time
         got_heart = check_for_heart(best_task, task_length, int(task_options[best_option][2]))
         tasks_completed += 1
         while(above_average and SLAYER_CAPE and (random.randrange(10) == 0) and not got_heart):
-            total_time += calc_time(best_task, task_length)
+            task_stats[last_task][0] += 1
+            task_stats[last_task][1] += added_time
+            task_stats[last_task][task_options[best_option][3]] += 1
+            total_time += added_time
             got_heart = check_for_heart(best_task, task_length, int(task_options[best_option][2]))
             tasks_completed += 1
 
     # print(f"total time: {total_time}, tasks completed: {tasks_completed}")
+    global total_tasks
+    total_tasks += tasks_completed
     return(total_time)
     
 
@@ -106,9 +160,8 @@ def choose_task_options(last_task: str, tasks_completed: int):
                             if(task_options[previous_option][1] == task[1]):
                                 break
                     #check if blocked
-                    for blocked_task in BLOCKS:
-                        if(blocked_task == task[1]):
-                            break
+                    if((BLOCKS[0] == task[1]) or (BLOCKS[1] == task[1])):
+                        break
                     chosen_task = task[1]
                     break
         # choose modifier
@@ -124,26 +177,26 @@ def choose_task_options(last_task: str, tasks_completed: int):
         match(modifier):
             #slayer points
             case 0:
-                task_options.append([chosen_task, "0", "0"])
+                task_options.append([chosen_task, "0", "0", 3])
             #task quantity
             case 1:
                 if int(task[6]) < 0:
                     length_modifier = -random.randrange(-int(task[6]), (-int(task[7])) + 1)
                 else:
                     length_modifier = random.randrange(int(task[6]), int(task[7]) + 1)
-                task_options.append([chosen_task, length_modifier, "0"])
+                task_options.append([chosen_task, length_modifier, "0", 4])
             #clue scrolls
             case 2:
-                task_options.append([chosen_task, "0", "0"])
+                task_options.append([chosen_task, "0", "0", 5])
             #superior drop rate
             case 3:
                 min = int(task[14].split(".")[0])
                 max = int(task[15].split(".")[0])
                 superior_modifier = 5 * random.randrange(int(min/5), int(max/5) + 1)
-                task_options.append([chosen_task, "0", superior_modifier])
+                task_options.append([chosen_task, "0", superior_modifier, 6])
             #slayer xp
             case 4:
-                task_options.append([chosen_task, "0", "0"])
+                task_options.append([chosen_task, "0", "0", 7])
     return task_options
             
 def load_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
@@ -202,12 +255,15 @@ def calc_task_length(task: list[str], length_modifier: int, bracelet: Bracelet, 
     return task_length
 
 def check_for_heart(task: list[str], task_length: int, drop_modifier: int):
+    task_stats[task[1]][2] += int(task_length * float(task[19]) * (1.0 + xp_boost))
     heart_chance = int(task[16])
     # no reason to randomize superiors until remainder, so one superior every on-rate until then
     while(task_length >= SUPERIOR_RATE):
+        task_stats[task[1]][2] += (float(task[20]) - float(task[19])) * (1.0 + xp_boost)
         if(spawn_superior(heart_chance, drop_modifier)): return True
         task_length -= SUPERIOR_RATE
     if(random.randrange(0, SUPERIOR_RATE) < task_length):
+        task_stats[task[1]][2] += (float(task[20]) - float(task[19])) * (1.0 + xp_boost)
         if(spawn_superior(heart_chance, drop_modifier)): return True
     return False
 
