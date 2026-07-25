@@ -1,13 +1,9 @@
 import csv
+import configparser
 from enum import Enum
 import random
 
-TASK_PREP_TIME = 30 # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 HOUR = 6000
-SUPERIOR_RATE = 150
-SIMS_PER_TASK = 2000
-HEARTS_SIMULATED = 2000
-TIME_PER_HEART = 71 * HOUR
 class Bracelet(Enum):
     NONE = 1
     SLAUGHTER = 2
@@ -19,13 +15,26 @@ with open("Mortimer.csv", mode="r") as mfile:
 with open("task_ratings.csv", mode="r") as srfile:
     saved_ratings = list(csv.reader(srfile))[:]
 
+config = configparser.ConfigParser()
+config.read("config.ini")
+TASK_PREP_TIME = config.getint("settings", "task_prep_time") # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
+SUPERIOR_RATE = config.getint("settings", "superior_rate")
+SIMS_PER_TASK = config.getint("settings", "sims_per_task")
+HEARTS_SIMULATED = config.getint("settings", "hearts_simulated")
+TIME_PER_HEART = config.getfloat("settings", "time_per_heart")
+SLAYER_CAPE = config.getboolean("settings", "slayer_cape")
+BLOCKS = config["settings"]["blocks"]
+WRITE_RATES = config.getboolean("mode", "write_rates")
+
 total_weight = 0
 for t in tasks:
     total_weight += int(t[2])
 
 def main():
-    sim_all()
-    #write_expected_rates()
+    if WRITE_RATES:
+        write_expected_rates()
+    else:
+        sim_all()
 
 def write_expected_rates():
     ratings = []
@@ -43,13 +52,14 @@ def sim_all():
         total_time_taken += sim()
     print(f"total time taken: {total_time_taken}")
     print(f"time taken per heart: {total_time_taken/HEARTS_SIMULATED}")
+    print(f"in hours: {total_time_taken/HEARTS_SIMULATED/HOUR}")
 
 
 def sim():
     got_heart = False
     total_time = 0
     last_task = "None"
-    tasks_completed = 100
+    tasks_completed = 0
     while(got_heart == False):
         task_options = choose_task_options(last_task, tasks_completed)
         task_ratings = []
@@ -60,7 +70,8 @@ def sim():
         last_task = task_options[best_option][0]
         best_task = get_task(last_task)
         # print(f"tasks completed: {tasks_completed} time taken: {total_time}")
-        if(task_ratings[best_option] < 0):
+        above_average = task_ratings[best_option] < 0
+        if(above_average):
             task_length = calc_task_length(best_task, int(task_options[best_option][1]), Bracelet.SLAUGHTER, False)
             # print(f"doing {best_task[1]} with {task_options[best_option][1]} quantity and {task_options[best_option][2]}% more hearts using slaughter bracelets over {task_options}")
         else:
@@ -69,7 +80,12 @@ def sim():
         total_time += calc_time(best_task, task_length)
         got_heart = check_for_heart(best_task, task_length, int(task_options[best_option][2]))
         tasks_completed += 1
-    print(f"total time: {total_time}, tasks completed: {tasks_completed}")
+        while(above_average and SLAYER_CAPE and (random.randrange(10) == 0) and not got_heart):
+            total_time += calc_time(best_task, task_length)
+            got_heart = check_for_heart(best_task, task_length, int(task_options[best_option][2]))
+            tasks_completed += 1
+
+    # print(f"total time: {total_time}, tasks completed: {tasks_completed}")
     return(total_time)
     
 
@@ -89,6 +105,10 @@ def choose_task_options(last_task: str, tasks_completed: int):
                         for previous_option in range(option):
                             if(task_options[previous_option][1] == task[1]):
                                 break
+                    #check if blocked
+                    for blocked_task in BLOCKS:
+                        if(blocked_task == task[1]):
+                            break
                     chosen_task = task[1]
                     break
         # choose modifier
@@ -140,17 +160,19 @@ def load_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int)
     else:
         raise NameError("task name not found")
 
-def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
-    task_completion_time = calc_time(task, calc_task_length(task, length_modifier, Bracelet.SLAUGHTER, True))
+def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int, bracelet=Bracelet.EXPEDITIOUS):
+    task_completion_time = calc_time(task, calc_task_length(task, length_modifier, bracelet, True))
     total_time = 0
     for sim in range(SIMS_PER_TASK):
-        task_length = calc_task_length(task, length_modifier, Bracelet.SLAUGHTER, False)
+        task_length = calc_task_length(task, length_modifier, bracelet, False)
         got_heart = False
         while(got_heart == False):
             total_time += calc_time(task, task_length)
             got_heart = check_for_heart(task, task_length, drop_modifier)
 
     task_time_per_heart = total_time / SIMS_PER_TASK
+    if(task_time_per_heart < TIME_PER_HEART and bracelet == Bracelet.EXPEDITIOUS):
+        return sim_ticks_wasted(task, length_modifier, drop_modifier, Bracelet.SLAUGHTER)
 
     return(task_completion_time * (1-(TIME_PER_HEART/task_time_per_heart)))
 
