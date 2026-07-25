@@ -6,23 +6,26 @@ TASK_PREP_TIME = 30 # time to go back to Mortimer, choose task, restore stats if
 HOUR = 6000
 SUPERIOR_RATE = 150
 SIMS_PER_TASK = 2000
-HEARTS_SIMULATED = 10
-TIME_PER_HEART = 70 * HOUR
+HEARTS_SIMULATED = 2000
+TIME_PER_HEART = 71 * HOUR
 class Bracelet(Enum):
     NONE = 1
     SLAUGHTER = 2
     EXPEDITIOUS = 3
 
-with open("Mortimer.csv", mode="r") as file:
-    tasks = list(csv.reader(file))[1:]
+with open("Mortimer.csv", mode="r") as mfile:
+    tasks = list(csv.reader(mfile))[1:]
+
+with open("task_ratings.csv", mode="r") as srfile:
+    saved_ratings = list(csv.reader(srfile))[:]
 
 total_weight = 0
 for t in tasks:
     total_weight += int(t[2])
 
 def main():
-    # sim_all()
-    write_expected_rates()
+    sim_all()
+    #write_expected_rates()
 
 def write_expected_rates():
     ratings = []
@@ -51,7 +54,7 @@ def sim():
         task_options = choose_task_options(last_task, tasks_completed)
         task_ratings = []
         for option in task_options:
-            ticks_wasted = sim_ticks_wasted(get_task(option[0]), int(option[1]), int(option[2]))
+            ticks_wasted = load_ticks_wasted(get_task(option[0]), int(option[1]), int(option[2]))
             task_ratings.append(ticks_wasted)
         best_option = task_ratings.index(min(task_ratings))
         last_task = task_options[best_option][0]
@@ -123,6 +126,19 @@ def choose_task_options(last_task: str, tasks_completed: int):
                 task_options.append([chosen_task, "0", "0"])
     return task_options
             
+def load_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
+    for r in saved_ratings:
+        if r[0] == task[1]:
+            # ratio is 0 when length modifier is min, 1 when max
+            if(length_modifier > 0):
+                ratio = float(abs(length_modifier) - abs(int(task[6])))/float(abs(int(task[7]) - abs(int(task[6]))))
+                return ratio*float(r[3]) + ((1-ratio)*float(r[2]))
+            if(drop_modifier > 0):
+                ratio = float(drop_modifier - int(task[14].split(".")[0]))/float(int(task[15].split(".")[0]) - int(task[14].split(".")[0]))
+                return ratio*float(r[5]) + ((1-ratio)*float(r[4]))
+            return float(r[1])
+    else:
+        raise NameError("task name not found")
 
 def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
     task_completion_time = calc_time(task, calc_task_length(task, length_modifier, Bracelet.SLAUGHTER, True))
