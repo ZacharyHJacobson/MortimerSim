@@ -146,7 +146,7 @@ def sim():
 def choose_task_options(last_task: str, tasks_completed: int):
     task_options: list[list[str]]
     task_options = []
-    for option in range(3 if tasks_completed >= 100 else 2):
+    for option in range(3 if tasks_completed >= 50 else 2):
         # choose task, can't be the previous task or one of the others on offer
         chosen_task = last_task
         while(chosen_task == last_task):
@@ -166,9 +166,9 @@ def choose_task_options(last_task: str, tasks_completed: int):
                     break
         # choose modifier
         modifiers_unlocked = 2
-        if tasks_completed >= 25: modifiers_unlocked = 3
-        if tasks_completed >= 50: modifiers_unlocked = 4
-        if tasks_completed >= 75: modifiers_unlocked = 5
+        if tasks_completed >= 15: modifiers_unlocked = 3
+        if tasks_completed >= 25: modifiers_unlocked = 4
+        if tasks_completed >= 40: modifiers_unlocked = 5
         task = get_task(chosen_task)
         modifier = random.randrange(modifiers_unlocked)
         #reroll modifier when clue scroll modifiers are impossible
