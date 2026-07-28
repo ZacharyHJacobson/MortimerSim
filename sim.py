@@ -9,20 +9,15 @@ Bracelet = IntEnum("Bracelet", ["NONE", "SLAUGHTER", "EXPEDITIOUS"])
 with open("Mortimer.csv", mode="r") as mfile:
     tasks = list(csv.reader(mfile))[1:]
 Stats = IntEnum("Stats", ["SLAYER_LEVEL", "CREATURE", "WEIGHTING", "ASSIGN_MIN", "ASSIGN_MAX", "EXTENDABLE", "QUANTITY_MIN", "QUANTITY_MAX", "POINTS_MIN", "POINTS_MAX", "CLUE_MIN", "CLUE_MAX", "XP_MIN", "XP_MAX", "DROP_MIN", "DROP_MAX", "HEART_DENOMINATOR", "TRAVEL_TIME", "KILLS_PER_HOUR", "NORMAL_EXPERIENCE", "SUPERIOR_EXPERIENCE"], start=0)
-with open("task_ratings.csv", mode="r") as srfile:
-    saved_ratings = list(csv.reader(srfile))[:]
-RatingsStats = IntEnum("RatingsStats", ["CREATURE", "NORMAL", "QUANTITY_MIN", "QUANTITY_MAX", "DROP_MIN", "DROP_MAX"], start=0)
 
 config = configparser.ConfigParser()
 config.read("config.ini")
 TASK_PREP_TIME = config.getint("settings", "task_prep_time") # time to go back to Mortimer, choose task, restore stats if desired, and bank for new task
 SUPERIOR_RATE = config.getint("settings", "superior_rate")
-SIMS_PER_TASK = config.getint("settings", "sims_per_task")
 HEARTS_SIMULATED = config.getint("settings", "hearts_simulated")
 TIME_PER_HEART = config.getfloat("settings", "time_per_heart")
 SLAYER_CAPE = config.getboolean("settings", "slayer_cape")
 BLOCKS = [config["settings"]["block1"],config["settings"]["block2"]]
-WRITE_RATES = config.getboolean("mode", "write_rates")
 
 total_weight = 0
 for t in tasks:
@@ -31,22 +26,6 @@ for t in tasks:
 xp_boost = 0.0
 
 def main():
-    if WRITE_RATES:
-        write_expected_rates()
-    else:
-        sim_all_hearts()
-
-def write_expected_rates():
-    ratings = []
-    for task in tasks:
-        print(f"Writing {task[Stats.CREATURE]}...")
-        ratings.append([task[Stats.CREATURE], sim_ticks_wasted(task, 0, 0), sim_ticks_wasted(task, int(task[Stats.QUANTITY_MIN]), 0), sim_ticks_wasted(task, int(task[Stats.QUANTITY_MAX]), 0), sim_ticks_wasted(task, 0, int(task[Stats.DROP_MIN].split(".")[0])), sim_ticks_wasted(task, 0, int(task[Stats.DROP_MAX].split(".")[0]))])
-
-    with open("task_ratings.csv", "w", newline ="") as rfile:
-        csv.writer(rfile).writerows(ratings)
-
-
-def sim_all_hearts():
     total_time_taken = 0
     for _ in range(HEARTS_SIMULATED):
         total_time_taken += sim_until_heart()
@@ -64,7 +43,7 @@ def sim_until_heart():
         task_options = choose_task_options(last_task_name, tasks_completed)
         task_ratings = []
         for option in task_options:
-            ticks_wasted = load_ticks_wasted(get_task(option[0]), int(option[1]), int(option[2]))
+            ticks_wasted = calc_ticks_wasted(get_task(option[0]), int(option[1]), int(option[2]))
             task_ratings.append(ticks_wasted)
         best_option = task_ratings.index(min(task_ratings))
         last_task_name = task_options[best_option][0]
@@ -144,34 +123,14 @@ def choose_task_options(last_task_name: str, tasks_completed: int):
             case 4:
                 task_options.append([chosen_task_name, "0", "0", 7])
     return task_options
-            
-def load_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int):
-    for r in saved_ratings:
-        if r[RatingsStats.CREATURE] == task[Stats.CREATURE]:
-            # ratio is 0 when length modifier is min, 1 when max
-            if(length_modifier > 0):
-                ratio = float(abs(length_modifier) - abs(int(task[Stats.QUANTITY_MIN])))/float(abs(int(task[Stats.QUANTITY_MAX]) - abs(int(task[Stats.QUANTITY_MIN]))))
-                return ratio*float(r[RatingsStats.QUANTITY_MAX]) + ((1-ratio)*float(r[RatingsStats.QUANTITY_MIN]))
-            if(drop_modifier > 0):
-                ratio = float(drop_modifier - int(task[Stats.DROP_MIN].split(".")[0]))/float(int(task[Stats.DROP_MAX].split(".")[0]) - int(task[Stats.DROP_MIN].split(".")[0]))
-                return ratio*float(r[RatingsStats.DROP_MAX]) + ((1-ratio)*float(r[RatingsStats.DROP_MIN]))
-            return float(r[RatingsStats.NORMAL])
-    else:
-        raise NameError("task name not found")
 
-def sim_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int, bracelet=Bracelet.EXPEDITIOUS):
-    task_completion_time = time_per_task(task, kills_per_task(task, length_modifier, bracelet, True))
-    total_time = 0
-    for sim in range(SIMS_PER_TASK):
-        task_length = kills_per_task(task, length_modifier, bracelet, False)
-        got_heart = False
-        while(got_heart == False):
-            total_time += time_per_task(task, task_length)
-            got_heart = check_task_for_heart(task, task_length, drop_modifier)
-
-    task_time_per_heart = total_time / SIMS_PER_TASK
+def calc_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int, bracelet=Bracelet.EXPEDITIOUS):
+    task_length = kills_per_task(task, length_modifier, bracelet, True)
+    task_completion_time = time_per_task(task, task_length)
+    tasks_per_heart = count_tasks_for_heart(task, task_length, drop_modifier)
+    task_time_per_heart = task_completion_time * tasks_per_heart
     if(task_time_per_heart < TIME_PER_HEART and bracelet == Bracelet.EXPEDITIOUS):
-        return sim_ticks_wasted(task, length_modifier, drop_modifier, Bracelet.SLAUGHTER)
+        return calc_ticks_wasted(task, length_modifier, drop_modifier, Bracelet.SLAUGHTER)
 
     return(task_completion_time * (1-(TIME_PER_HEART/task_time_per_heart)))
 
@@ -198,6 +157,11 @@ def kills_per_task(task: list[str], length_modifier: int, bracelet: Bracelet, av
         case Bracelet.EXPEDITIOUS:
             task_length -= int(task_length / 5)
     return task_length
+
+def count_tasks_for_heart(task: list[str], task_length: int, drop_modifier: int):
+    superiors_per_task = task_length/SUPERIOR_RATE
+    superiors_per_heart = (int(task[Stats.HEART_DENOMINATOR]) * 100.0) / (100.0 + drop_modifier)
+    return superiors_per_heart/superiors_per_task
 
 def check_task_for_heart(task: list[str], task_length: int, drop_modifier: int):
     num_superiors = int(task_length/SUPERIOR_RATE)
