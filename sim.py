@@ -65,6 +65,7 @@ def sim_until_heart():
             tasks_completed += 1
 
             first_completion = False
+        if(got_heart): time_elapsed -= 0.5*added_time
     return(time_elapsed)
     
 
@@ -81,9 +82,12 @@ def choose_task_options(last_task_name: str, tasks_completed: int):
                 if(task_by_weight < 0):
                     #check if repeat
                     if(option != 0):
+                        already_chosen = False
                         for previous_option in range(option):
-                            if(task_options[previous_option][1] == task[Stats.CREATURE]):
+                            if(task_options[previous_option][0] == task[Stats.CREATURE]):
+                                already_chosen = True
                                 break
+                        if(already_chosen): break
                     #check if blocked
                     if((BLOCKS[0] == task[Stats.CREATURE]) or (BLOCKS[1] == task[Stats.CREATURE])):
                         break
