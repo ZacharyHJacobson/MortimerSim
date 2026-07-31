@@ -127,11 +127,12 @@ def choose_task_options(last_task_name: str, tasks_completed: int):
 def calc_ticks_wasted(task: list[str], length_modifier: int, drop_modifier: int, bracelet=Bracelet.EXPEDITIOUS):
     task_length = kills_per_task(task, length_modifier, bracelet, True)
     task_completion_time = time_per_task(task, task_length)
+    if(task[Stats.HEART_DENOMINATOR] == "0"): return task_completion_time;
+    
     tasks_per_heart = count_tasks_for_heart(task, task_length, drop_modifier)
     task_time_per_heart = task_completion_time * tasks_per_heart
     if(task_time_per_heart < TIME_PER_HEART and bracelet == Bracelet.EXPEDITIOUS):
         return calc_ticks_wasted(task, length_modifier, drop_modifier, Bracelet.SLAUGHTER)
-
     return(task_completion_time * (1-(TIME_PER_HEART/task_time_per_heart)))
 
 def time_per_task(task: list[str], task_length: int):
@@ -164,6 +165,7 @@ def count_tasks_for_heart(task: list[str], task_length: int, drop_modifier: int)
     return superiors_per_heart/superiors_per_task
 
 def check_task_for_heart(task: list[str], task_length: int, drop_modifier: int):
+    if(task[Stats.HEART_DENOMINATOR] == "0"): return False;
     num_superiors = int(task_length/SUPERIOR_RATE)
     if(random.randrange(0, SUPERIOR_RATE) < task_length%SUPERIOR_RATE): num_superiors += 1
     for _ in range(num_superiors):
